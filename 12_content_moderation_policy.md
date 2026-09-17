@@ -38,11 +38,14 @@ far harder than building it in from Phase 1.
 - MVP-stage: a small moderation team (even 1–2 people initially) reviews the
   `pending` queue and escalated reports through an internal admin
   view/dashboard — doesn't need to be user-facing, can be a simple internal
-  tool reading directly from Firestore
+  tool reading directly from Postgres with the **service-role key** (server-side
+  only; that key must never reach a client bundle). A Supabase Studio SQL view
+  over `posts`/`comments`/`reports` filtered to `moderation_status = 'pending'`
+  is enough for the first months
 - SLA target for MVP: review within 24 hours; tighten as volume grows
 
 ### 4. Enforcement actions (graduated)
-1. Content removal (sets `moderationStatus: "removed"`, not hard-deleted —
+1. Content removal (sets `moderation_status = 'removed'`, not hard-deleted —
    retained internally for appeals/audit per
    `13_data_retention_and_privacy_handling.md`)
 2. Warning to user

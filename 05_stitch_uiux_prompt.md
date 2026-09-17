@@ -164,7 +164,7 @@ treatment. [Additional notes for this screen, if any.]
 34. Composer — entry/type picker (text / image / video)
 35. Composer — text post screen
 36. Composer — image picker + crop screen
-37. Composer — video picker + trim screen (60s cap indicator)
+37. Composer — video picker + trim screen (5-minute cap indicator; on web this screen shows a short "video posting is available in the Android app" notice instead of a picker)
 38. Composer — tagging screen (tag drama/actor/community, spoiler toggle)
 
 ### K. Search

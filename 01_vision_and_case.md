@@ -45,11 +45,13 @@ half-fitting tools stitched together.
    and how they engage. That's the foundation for personalization, and later,
    monetization (ads, creator tools, merch/ticketing) without having to
    retrofit it in.
-5. **One codebase, three platforms** — building on Kotlin Multiplatform +
-   Compose Multiplatform means the product logic and (most of the) UI is
-   written once and shipped to Android, iOS, and Web, instead of maintaining
-   three separate teams/codebases. For a project without funding pressure yet,
-   that's a large time-and-cost advantage.
+5. **One codebase, two shipping surfaces** — building on **React Native + Expo**
+   means the product logic and most of the UI is written once and shipped to
+   Android (native) and Web (via `react-native-web`), instead of maintaining
+   separate teams/codebases. The web build doubles as the iOS delivery vehicle —
+   an installable home-screen app that reaches iPhone users for $0, with no
+   Apple developer account. For a project without funding pressure, that's a
+   large time-and-cost advantage. See `03_technical_architecture_expo.md`.
 
 ## Who this is for
 

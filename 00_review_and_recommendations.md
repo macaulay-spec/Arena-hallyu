@@ -2,6 +2,37 @@
 
 *Reviewed 2026-09-16 against the 11 documents currently in this repository.*
 
+> ## ⚠️ The stack assumption in this review is wrong — read this first
+>
+> **Hallyu is React Native + Expo, not Kotlin Multiplatform.** That was confirmed
+> 2026-09-17, after this review was written. The pack's own documents said KMP,
+> so the review assessed the KMP plan on its own terms — competently, but against
+> a stack that isn't being built.
+>
+> **Everything below about the backend (Supabase, RLS, R2, egress, moderation,
+> TVmaze, budgets, roadmap realism) still stands.** Everything about the *client*
+> is superseded. Specifically:
+>
+> | This review says | Now |
+> |---|---|
+> | `supabase-kt` is community-maintained, effectively one maintainer — a load-bearing risk (§1, §9) | **Void.** `@supabase/supabase-js` is Supabase's own first-party client with a documented React Native quickstart. Risk gone. |
+> | Compose/Wasm renders to a `<canvas>`, so **zero SEO** — build a separate prerendering system | **Void, and better than fixed.** Expo Router does static rendering (build-time HTML) and `generateMetadata` for per-route SEO. It's a framework feature, not a project. |
+> | A `<video>` element can't render inside a Skia canvas — needs `wasmJsMain` DOM interop, position-synced to a swipe gesture (§6, §8) | **Void.** `react-native-web` renders real DOM; `expo-video` maps to a real `<video>`. This was the hardest problem in the plan and it no longer exists. |
+> | Client-side video compression is a platform project — `Media3 Transformer` in `androidMain`, `AVAssetExportSession` in `iosMain` | **Void.** It's one prop: `expo-image-picker`'s `videoQuality`. Which also re-encodes iPhone HEVC → H.264 for free. |
+> | Offline-first needs SQLDelight `.sqm` migrations; SQLDelight on Wasm ships a second WASM artifact | **Replaced.** `expo-sqlite` on native; a two-tier storage interface on web (§4b of `16`). |
+> | macOS CI minutes are critical — a KMP project must compile an iOS target per run | **Reduced.** Expo's free tier gives 15 iOS builds/month and local builds are free. PR pipeline is Linux-only. |
+> | 16 KB page-size alignment is a known KMP/Kotlin-Native runtime gotcha | **Moot** for Expo; still worth verifying on a real 16 KB emulator image. |
+> | Ktor, kotlinx.serialization, Koin, Coil 3, Voyager, Coroutines/Flow (§9 library choices) | **Replaced.** TanStack Query, Zustand, NativeWind, FlashList v4, Reanimated v4, expo-image, expo-router. |
+> | Video cap is 60 seconds | **Wrong regardless of stack — it's 5 minutes.** Storage, not bandwidth, becomes the binding constraint (§2.1 of `16`). |
+>
+> **Also void from the earlier banner:** `04_ai_studio_build_prompt.md` has been
+> rewritten. It instructed an AI to scaffold a Kotlin/Gradle project and would
+> have generated the wrong app. That was the single most consequential defect in
+> the pack and it is fixed.
+>
+> **Read this review for the backend and product analysis. For the client, read
+> `03_technical_architecture_expo.md` and §3–§4 of `16_zero_budget_stack.md`.**
+
 > **Superseded in part by `16_zero_budget_stack.md`** (same date), which was
 > written after a "must run on zero budget" constraint was added. Three
 > conclusions below are revised there:
@@ -51,34 +82,45 @@ fix after code exists. Details below.
 
 ---
 
-## 1. The pack contradicts itself on backend (P0)
+## 1. The pack contradicts itself on backend (P0) — **RESOLVED 2026-09-17**
 
-You asked about migrating to Supabase. The important finding is that **you
-already did — on paper, in two documents — and never finished.** The result is
-a spec that cannot be handed to an engineer or to an AI build agent without
+You asked about migrating to Supabase. The important finding was that **you
+already had — on paper, in two documents — and never finished.** The result was
+a spec that could not be handed to an engineer or to an AI build agent without
 producing two different apps.
 
-| Document | Backend it specifies |
-|---|---|
-| `03_technical_architecture_kmp.md` | **Supabase** (Postgres + Auth + Realtime + Storage) |
-| `04_ai_studio_build_prompt.md` | **Supabase** (Postgres, Auth, Realtime, Storage) via Ktor |
-| `06_prd_and_roadmap.md` | **Firebase** — 6 references: "Firebase Auth", "Cloud Function", "Firestore listeners", "FCM" |
-| `08_api_contract.md` | **Firebase** — 17 references; entire doc is Firestore collections, Cloud Functions, Security Rules |
-| `11_test_strategy.md` | **Firebase** — 8 references; Firebase Emulator Suite, `@firebase/rules-unit-testing`, "Firebase autoscaling" |
-| `12_content_moderation_policy.md` | **Firebase** — Cloud Function trigger, "reading directly from Firestore" |
-| `15_privacy_policy.md` | **Firebase** — 5 references incl. "Firebase Analytics" and Firebase as a named data processor |
+**This is now fixed.** The table below is kept as the record of what was wrong;
+the "Now" column is current.
 
-Concrete collisions:
+| Document | Backend it *specified* | Now |
+|---|---|---|
+| `03_technical_architecture_expo.md` *(was `..._kmp.md`)* | **Supabase** (Postgres + Auth + Realtime + Storage) | ✅ Supabase, and rewritten for Expo. Storage split: **video → Cloudflare R2**, avatars/post images → Supabase Storage |
+| `04_ai_studio_build_prompt.md` | **Supabase** via Ktor | ✅ Rewritten — `@supabase/supabase-js`, no Ktor |
+| `06_prd_and_roadmap.md` | **Firebase** — 6 refs: "Firebase Auth", "Cloud Function", "Firestore listeners", "FCM" | ✅ All six replaced: Supabase Auth, Postgres triggers, Supabase Realtime, Expo Push + Web Push |
+| `08_api_contract.md` | **Firebase** — 17 refs; entire doc was Firestore collections, Cloud Functions, Security Rules | ✅ **Fully rewritten** as a Supabase contract: RLS-gated table surface, trigger/`pg_cron`/Edge-Function split, Realtime topology |
+| `11_test_strategy.md` | **Firebase** — 8 refs; Firebase Emulator Suite, `@firebase/rules-unit-testing`, "Firebase autoscaling" | ✅ **Fully rewritten**: local Supabase + **RLS policy tests as the non-negotiable layer** |
+| `12_content_moderation_policy.md` | **Firebase** — Cloud Function trigger, "reading directly from Firestore" | ✅ Fixed — service-role Postgres read |
+| `15_privacy_policy.md` | **Firebase** — 5 refs incl. "Firebase Analytics" and Firebase as a named processor | ✅ Fixed — PostHog for analytics; processors now Supabase, Cloudflare, Expo, PostHog, TVmaze |
 
-- `06` §1 acceptance criteria says *"Sign up via email or Google/Apple sign-in
-  **(Firebase Auth)**"* while `03` says Supabase Auth.
-- `06` §7 says *"DMs: real-time via **Firestore listeners**"* while `03` says
-  Supabase Realtime.
+The pack now says Supabase consistently. **The remaining gap is not a
+contradiction but an absence: `09_database_schema.md` still does not exist**, so
+there is RLS prose in `08` and RLS test cases in `11` with no policies between
+them. That is the critical path.
+
+Concrete collisions, as they were:
+
+- `06` §1 acceptance criteria said *"Sign up via email or Google/Apple sign-in
+  **(Firebase Auth)**"* while `03` said Supabase Auth. → Fixed; Apple sign-in
+  dropped entirely (no native iOS build, no Apple account).
+- `06` §7 said *"DMs: real-time via **Firestore listeners**"* while `03` said
+  Supabase Realtime. → Fixed.
 - `08`'s entire premise — *"Firebase/Firestore doesn't use a REST/OpenAPI
-  contract the way a custom backend would"* — is **now false**. Supabase
-  exposes an auto-generated REST surface via PostgREST plus Edge Functions with
-  ordinary HTTP contracts. That document needs a rewrite, not a patch.
-- `15` names **Firebase (Google)** as a service provider and a data processor.
+  contract the way a custom backend would"* — **was already false when written.**
+  Supabase exposes an auto-generated REST surface via PostgREST plus Edge
+  Functions with ordinary HTTP contracts. That document needed a rewrite, not a
+  patch. → Rewritten.
+- `15` named **Firebase (Google)** as a service provider and a data processor.
+  → Fixed.
   Shipping that privacy policy against a Supabase backend would be a
   materially inaccurate disclosure to users and regulators. This one has legal
   teeth, not just technical ones.

@@ -10,7 +10,7 @@ review, not a publishable document as-is. Fill in [bracketed] fields.*
 | Account data | Email, auth provider ID | You, at signup |
 | Profile data | Handle, display name, avatar, bio | You |
 | Content | Posts, comments, videos, messages | You |
-| Usage data | App interactions, feature usage | Automatically, via Firebase Analytics |
+| Usage data | App interactions, feature usage | Automatically, via PostHog (pseudonymous, no advertising ID required) |
 | Device data | Device type, OS version, push token | Automatically |
 
 See `13_data_retention_and_privacy_handling.md` for the full internal data
@@ -30,9 +30,11 @@ would require updated disclosures, not a quiet amendment.]
 
 ## 3. Who We Share It With
 
-- **Service providers**: Firebase (Google) for hosting, authentication, and
-  storage; content-moderation API providers for automated screening (see
-  `12_content_moderation_policy.md`)
+- **Service providers**: Supabase (database, authentication, image storage);
+  Cloudflare (web hosting and video storage/delivery); Expo (app updates and
+  push delivery); PostHog (product analytics); content-moderation API providers
+  for automated screening (see `12_content_moderation_policy.md`). Catalog
+  metadata is sourced from TVmaze.
 - **Legal requirements**: if required by law, subpoena, or to protect safety
 - We do not share your content or data with advertisers or data brokers.
 
@@ -66,16 +68,29 @@ collect data from children under this age.
 
 ## 7. Security
 
-We use industry-standard security practices (Firebase's built-in
-infrastructure security, access-controlled Security Rules, restricted
-internal access to sensitive data — see
-`13_data_retention_and_privacy_handling.md`) to protect your data, but no
-system is 100% secure.
+We use industry-standard security practices: Postgres Row Level Security
+policies that restrict every read and write to the rows you're permitted to see,
+encrypted transport (TLS) and encrypted storage at rest, encrypted device
+keychain storage for session tokens, and restricted internal access to sensitive
+data (see `13_data_retention_and_privacy_handling.md`) — but no system is 100%
+secure.
 
 ## 8. International Data Transfers
 
-[Firebase infrastructure may process/store data in regions outside your
-own — this needs a specific disclosure once hosting regions are finalized.]
+Your data is stored in the Supabase project region we select at setup, and
+video files are distributed through Cloudflare's global network (anycast), which
+means a video you upload may be cached and served from data centers in other
+countries in order to play it quickly. Push notifications are relayed through
+Expo's push service to your device's platform provider (Google's FCM on Android;
+Apple's APNs if you use the iOS web app's push through a browser).
+
+[**Decision still open:** pick the Supabase region before launch and state it
+here explicitly. If you expect meaningful EU/UK traffic — and a K-drama fandom
+app will have some — `eu-west-1`/`eu-west-2` gives you a straightforward GDPR
+story. If your launch audience is West Africa and Southeast Asia, a closer
+region (`eu-west-1` for Africa, `ap-southeast-1` for SEA) reduces latency
+materially. This is a one-line setting at project creation and expensive to
+change later.]
 
 ## 9. Changes to This Policy
 

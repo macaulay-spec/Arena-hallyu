@@ -6,10 +6,10 @@
 reflects my fandom.
 
 **Acceptance criteria:**
-- Sign up via email or Google/Apple sign-in (Firebase Auth)
+- Sign up via email or Google sign-in (Supabase Auth). *No Apple sign-in at MVP — there is no native iOS build and no Apple developer account.*
 - Profile has: handle (unique), display name, avatar, bio (160 char max)
 - Profile shows followed dramas/actors as visible chips/badges
-- Editing profile reflects instantly across feed/comments (denormalized display name/avatar updated via Cloud Function on profile change)
+- Editing profile reflects instantly across feed/comments (denormalized display name/avatar updated by a Postgres trigger on profile change)
 
 ## 2. Onboarding
 
@@ -38,7 +38,8 @@ relevant discovery.
 **Acceptance criteria:**
 - Vertical swipe feed, autoplay on focus, mute by default with persistent unmute toggle
 - Like/comment/share visible as overlay, non-blocking to video
-- Video upload capped at 60 seconds for MVP
+- Video upload capped at **5 minutes** for MVP. Cap is enforced client-side at pick time *and* server-side before the row becomes visible — a client-only cap is bypassable.
+- Video **posting is Android-only**; web can watch but not post video (see `16_zero_budget_stack.md` §4)
 
 ## 5. Drama Hub
 
@@ -58,14 +59,14 @@ relevant discovery.
 ## 7. Messages & Channels
 
 **Acceptance criteria:**
-- DMs: 1:1 and group, real-time via Firestore listeners
+- DMs: 1:1 and group, real-time via Supabase Realtime (`postgres_changes` subscriptions on the messages table, scoped by conversation)
 - Channels: one-way broadcast — subscribers cannot reply into the channel thread, only react; replies route to creator's DMs
 - Channel data model is distinct from group-chat data model (no shared collection)
 
 ## 8. Post composer
 
 **Acceptance criteria:**
-- Supports text (500 char max), single image, or single video (≤60s)
+- Supports text (500 char max), single image, or single video (≤5 minutes)
 - Optional tagging to one drama, one actor, and/or one community
 - Tagged content appears in the relevant Hub/Community feed within 5 seconds (real-time listener, not polling)
 
@@ -79,33 +80,37 @@ relevant discovery.
 
 **Acceptance criteria:**
 - Triggered for: new episode of a followed drama, reply/mention, new channel broadcast from a followed channel
-- Delivered via FCM when app backgrounded, in-app banner when foregrounded
+- Delivered via push when app backgrounded (Expo Push Service → FCM on Android; Web Push/VAPID on web), in-app banner when foregrounded
 - Notification settings allow disabling each category independently
 
 ## 11. Follow system
 
 **Acceptance criteria:**
 - Follow/unfollow is a single tap, optimistic UI update (don't wait on network round-trip to reflect state)
-- Follow counts denormalized on profile doc, updated via Cloud Function (not client-side increment, to avoid race conditions)
+- Follow counts denormalized on the profile row, updated by a Postgres trigger (not client-side increment, to avoid race conditions)
 
 ---
 
 ## Roadmap
 
 ### Phase 0 — Foundation (weeks 1–3)
-- Project scaffold (KMP modules, Firebase project setup, CI pipeline)
-- Design system finalized in Stitch, tokens implemented in `theme/`
-- Auth + profile working end-to-end on Android
+- Project scaffold (**Expo SDK 57 app, expo-router route tree**, Supabase project + first migration, GitHub Actions pipeline)
+- Supabase client wired correctly once (`react-native-url-polyfill`, SecureStore session, AppState auto-refresh) — see `03_technical_architecture_expo.md`
+- **`09_database_schema.md` written and the RLS policy test suite standing up against local Supabase** (`11_test_strategy.md` §2)
+- Design system finalized in Stitch, tokens implemented in `src/theme` via NativeWind
+- Auth + profile working end-to-end on Android **and web**
+- Web build exporting to Cloudflare Pages, PWA manifest with `display: standalone`
 
 ### Phase 1 — MVP core (weeks 4–9)
 - Onboarding, Home Feed, Drama Hub, Communities, Post composer
-- Android + iOS parity
-- Internal dogfood build
+- **Android + web parity** — web is the iOS delivery vehicle, so it ships alongside Android rather than trailing it (`16_zero_budget_stack.md` §4)
+- Internal dogfood build, distributed by **direct APK link** + the Cloudflare Pages web URL (no store submission)
+- EAS Update wired so dogfood fixes ship without a re-download
 
 ### Phase 2 — MVP complete (weeks 10–13)
 - Explore (short-form video), Messages + Channels, Search, Notifications
-- Web target brought online
-- Closed beta
+- Web Push live (install-to-home-screen flow + VAPID) so iOS users get notifications
+- Closed beta — recruited via shared link, install prompt on web, sideload on Android
 
 ### Phase 3 — Post-MVP (weeks 14+)
 - Recommendation ranking beyond rule-based
@@ -117,4 +122,6 @@ relevant discovery.
 
 See `07_analytics_tracking_plan.md` for the event schema this roadmap assumes
 is instrumented from Phase 1 onward — instrumenting late is expensive to
-retrofit.
+retrofit. **That document does not exist yet.** `16_zero_budget_stack.md` §2.2
+settles the tool (PostHog, free to 1M events/month — events must *not* go into
+Postgres); the event schema itself is still unwritten.
